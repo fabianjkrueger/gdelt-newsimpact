@@ -1,0 +1,14 @@
+[project]
+name = "mlopsproject2"
+version = "0.1.0"
+description = "Project number 2 for DataTalksClub MLOps Zoomcamp"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "numpy",
+    "pandas",
+    "mlflow==2.14.1",
+    "gunicorn",
+    "jupyter>=1.1.1",
+    "scikit-learn>=1.7.1",
+]

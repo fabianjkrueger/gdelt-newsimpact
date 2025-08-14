@@ -1,0 +1,13 @@
+# Personal notes
+notes.txt
+
+# Virtual environment
+.venv/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# uv cache (optional)
+.uv_cache/
