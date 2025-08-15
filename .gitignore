@@ -21,3 +21,7 @@ __pycache__/
 *.json
 !requirements.json
 !package.json
+
+# Data directory
+# it contains large files and there is code for downloading the data
+/data/
