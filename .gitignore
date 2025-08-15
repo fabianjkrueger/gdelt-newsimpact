@@ -1,5 +1,10 @@
 # Personal notes
-notes.txt
+notes.md
+
+# Environment variables
+.env
+.env.local
+*.env
 
 # Virtual environment
 .venv/
@@ -9,5 +14,10 @@ __pycache__/
 *.pyc
 *.pyo
 
-# uv cache (optional)
+# uv cache
 .uv_cache/
+
+# Google Cloud credentials
+*.json
+!requirements.json
+!package.json

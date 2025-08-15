@@ -39,5 +39,25 @@ source .venv/bin/activate
 
 The environment will automatically use Python 3.12 and install all required dependencies as specified in `pyproject.toml`.
 
+## Setup Instructions
+
+1. Copy the environment template:
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Edit `.env` and set your unique project ID:
+   ```env
+   GOOGLE_CLOUD_PROJECT=mlops-zoomcamp-yourname
+   ```
+
+3. Run the setup script:
+   ```bash
+   chmod +x scripts/setup_gcloud.sh
+   ./scripts/setup_gcloud.sh
+   ```
+
+**Note**: Choose a globally unique project ID. If your chosen name is taken, try adding your initials or random numbers.
+
 
 
