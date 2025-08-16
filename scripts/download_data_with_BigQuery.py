@@ -18,6 +18,7 @@ Usage:
 - This works from any subdirectory of the project, as long as you specify the
     path to the script correctly, because paths for saving the data are managed
     relative to the project root
+- If you want to reproduce my results, use the default settings.
 ```
 # test it with a dry run first
 uv run python download_data_with_BigQuery.py --dry_run True
@@ -31,7 +32,9 @@ uv run python scripts/download_data_with_BigQuery.py \
     --end_date 2024-12-31 \
     --limit 10000 \
     --dry_run False \
-    --version_name 2024_subset_10k
+    --version_name 2024_subset_10k \
+    --seed 42 \
+    --test_size 0.2
 ```
 """
 
@@ -54,7 +57,7 @@ load_dotenv()
 # Paths
 PATH_REPO = Path(__file__).resolve().parent.parent
 PATH_DATA = PATH_REPO / "data" / "raw"
-
+PATH_DATA.mkdir(parents=True, exist_ok=True)
 
 # Functions
 # ---------
@@ -88,7 +91,8 @@ def safe_gdelt_query(
     end_date,
     limit=10000,
     dry_run=True,
-    client=None
+    client=None,
+    seed=42  # Add seed parameter for reproducibility
 ):
     """
     Safely query GDELT data with automatic cost estimation
@@ -99,6 +103,7 @@ def safe_gdelt_query(
         limit (int): Maximum number of rows to return
         dry_run (bool): If True, only estimate query cost
         client (bigquery.Client): BigQuery client
+        seed (int): Random seed for reproducible sampling
     Returns:
         pd.DataFrame: Dataframe with GDELT data
     """
@@ -140,7 +145,21 @@ def safe_gdelt_query(
     FROM `gdelt-bq.gdeltv2.events`
     WHERE SQLDATE >= {start_gdelt}  -- start date
       AND SQLDATE <= {end_gdelt}    -- end date
-    ORDER BY RAND()                 -- order rows randomly to get random sample
+    ORDER BY 
+        -- Create deterministic "random" order using hash of multiple columns
+        -- This ensures same seed always gives same data, but data appears random
+        MOD(
+            ABS(FARM_FINGERPRINT(
+                CONCAT(
+                    CAST(SQLDATE AS STRING),
+                    CAST(EventCode AS STRING), 
+                    CAST(Actor1Code AS STRING),
+                    CAST(ActionGeo_Lat AS STRING),
+                    CAST({seed} AS STRING)  -- Include seed in hash
+                )
+            )), 
+            1000000
+        )
     LIMIT {limit}                   -- limit the number of rows to return
     """
 
@@ -230,7 +249,30 @@ def save_data_to_parquet(
     default="2024_subset_10k",
     help="Version name. E.g. '2024_subset_10k'"
 )
-def main(start_date, end_date, limit, dry_run, version_name):
+@click.option(
+    "--seed",
+    type=int,
+    default=42,
+    help=(
+        "Random seed for reproducible sampling. "
+        "Don't change this if you want to exactly reproduce my results!"
+    )
+)
+@click.option(
+    "--test_size",
+    type=float,
+    default=0.2,
+    help="Test size. E.g. 0.2 for 20% test size"
+)
+def main(
+    start_date,
+    end_date,
+    limit,
+    dry_run,
+    version_name,
+    seed,
+    test_size
+):
     """
     Main function to run all steps.
     This initializes the BigQuery client, queries the data,
@@ -255,7 +297,8 @@ def main(start_date, end_date, limit, dry_run, version_name):
         end_date=end_date,
         limit=limit,
         dry_run=dry_run,
-        client=client
+        client=client,
+        seed=seed
     )
 
     # Don't continue if dry_run or no data
@@ -265,8 +308,8 @@ def main(start_date, end_date, limit, dry_run, version_name):
     # Split data into train and test
     train_df, test_df = train_test_split(
         data_gdelt,
-        test_size=0.2,
-        random_state=42
+        test_size=test_size,
+        random_state=seed
     )
 
     # Save data to parquet files
