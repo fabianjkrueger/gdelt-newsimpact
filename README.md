@@ -63,6 +63,10 @@ The environment will automatically use Python 3.12 and install all required depe
 
 ### Get the Data
 
+```bash
+uv run python scripts/download_data_with_BigQuery.py
+```
+
 
 I will just check if I can get some usable data from the GDELT 2.0 Event
 Database via Google BigQuery.
