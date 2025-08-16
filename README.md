@@ -1,4 +1,4 @@
-# mlopsproject2
+# gdelt-newsimpact
 Second project for DataTalksClub MLOps Zoomcamp
 
 ## Setup

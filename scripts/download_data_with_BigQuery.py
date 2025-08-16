@@ -33,7 +33,7 @@ uv run python scripts/download_data_with_BigQuery.py \
     --limit 10000 \
     --dry_run False \
     --version_name 2024_subset_10k \
-    --seed 42 \
+    --seed 1337 \
     --test_size 0.2
 ```
 """
@@ -152,9 +152,7 @@ def safe_gdelt_query(
             ABS(FARM_FINGERPRINT(
                 CONCAT(
                     CAST(SQLDATE AS STRING),
-                    CAST(EventCode AS STRING), 
-                    CAST(Actor1Code AS STRING),
-                    CAST(ActionGeo_Lat AS STRING),
+                    CAST(EventBaseCode AS STRING),
                     CAST({seed} AS STRING)  -- Include seed in hash
                 )
             )), 
@@ -252,7 +250,7 @@ def save_data_to_parquet(
 @click.option(
     "--seed",
     type=int,
-    default=42,
+    default=1337,
     help=(
         "Random seed for reproducible sampling. "
         "Don't change this if you want to exactly reproduce my results!"
