@@ -25,3 +25,13 @@ __pycache__/
 # Data directory
 # it contains large files and there is code for downloading the data
 /data/
+
+# MLFlow
+# FIXME
+# for now ignore the database and all artifacts
+# I *may* change this, because it could be relevant for passing the course
+# but the files are large, and I wouldn't usually track this
+# PostgreSQL persistent storage
+pgdata/
+# MLFlow artifacts
+mlartifacts/

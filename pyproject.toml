@@ -7,7 +7,7 @@ requires-python = ">=3.12"
 dependencies = [
     "numpy",
     "pandas",
-    "mlflow==2.14.1",
+    "mlflow==3.2.0",
     "gunicorn",
     "jupyter>=1.1.1",
     "scikit-learn>=1.7.1",
