@@ -59,6 +59,25 @@ The environment will automatically use Python 3.12 and install all required depe
 
 **Note**: Choose a globally unique project ID. If your chosen name is taken, try adding your initials or random numbers.
 
+## Build Docker Compose
+
+You already need the Docker compose at this point, because data preparation
+logs the ordinal encoder as an artifact.
+
+```bash
+# first time setup or if you changed anything (builds images)
+docker-compose up --build -d
+
+# subsequent starts (uses existing images)
+docker-compose up -d
+
+# stop the services
+docker-compose down
+```
+
+
+
+
 ## Data
 
 ### Get the Data
@@ -209,3 +228,96 @@ Rather, it's some system dependency.
 - libomp
 
 
+
+
+
+
+
+
+## Query Model Examples
+
+Start the Docker compose.
+
+### Single Prediction
+
+```bash
+curl -X POST http://localhost:5002/predict \
+  -H "Content-Type: application/json" \
+  -d '{
+    "EventCode": 120.0,
+    "EventBaseCode": 12.0,
+    "EventRootCode": 1.0,
+    "QuadClass": 3,
+    "GoldsteinScale": -2.5,
+    "Actor1Code": 100.0,
+    "Actor1Name": 50.0,
+    "Actor1CountryCode": 10.0,
+    "Actor2Code": 200.0,
+    "Actor2Name": 75.0,
+    "Actor2CountryCode": 20.0,
+    "ActionGeo_CountryCode": 30.0,
+    "ActionGeo_ADM1Code": 40.0,
+    "ActionGeo_Lat": 45.5,
+    "ActionGeo_Long": -75.2,
+    "ActionGeo_FeatureID": 123.0,
+    "year": 2024,
+    "month": 8,
+    "day_of_year": 230,
+    "day_of_week": 3,
+    "is_weekend": 0
+  }'
+```
+
+### Batch Prediction
+```bash
+curl -X POST http://localhost:5002/predict \
+  -H "Content-Type: application/json" \
+  -d '[
+    {
+      "EventCode": 120.0,
+      "EventBaseCode": 12.0,
+      "EventRootCode": 1.0,
+      "QuadClass": 3,
+      "GoldsteinScale": -2.5,
+      "Actor1Code": 100.0,
+      "Actor1Name": 50.0,
+      "Actor1CountryCode": 10.0,
+      "Actor2Code": 200.0,
+      "Actor2Name": 75.0,
+      "Actor2CountryCode": 20.0,
+      "ActionGeo_CountryCode": 30.0,
+      "ActionGeo_ADM1Code": 40.0,
+      "ActionGeo_Lat": 45.5,
+      "ActionGeo_Long": -75.2,
+      "ActionGeo_FeatureID": 123.0,
+      "year": 2024,
+      "month": 8,
+      "day_of_year": 230,
+      "day_of_week": 3,
+      "is_weekend": 0
+    },
+    {
+      "EventCode": 110.0,
+      "EventBaseCode": 11.0,
+      "EventRootCode": 1.0,
+      "QuadClass": 2,
+      "GoldsteinScale": -1.5,
+      "Actor1Code": 150.0,
+      "Actor1Name": 60.0,
+      "Actor1CountryCode": 15.0,
+      "Actor2Code": 250.0,
+      "Actor2Name": 85.0,
+      "Actor2CountryCode": 25.0,
+      "ActionGeo_CountryCode": 35.0,
+      "ActionGeo_ADM1Code": 45.0,
+      "ActionGeo_Lat": 40.5,
+      "ActionGeo_Long": -80.2,
+      "ActionGeo_FeatureID": 456.0,
+      "year": 2024,
+      "month": 9,
+      "day_of_year": 250,
+      "day_of_week": 1,
+      "is_weekend": 0
+    }
+  ]'
+```

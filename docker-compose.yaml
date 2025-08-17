@@ -30,3 +30,14 @@ services:
       - POSTGRES_DB=${POSTGRES_DB}
     volumes:
       - ./mlartifacts:/mlartifacts:rw
+
+  deploy_model:
+    build:
+      context: .
+      dockerfile: deploy_model.dockerfile
+    ports:
+      - "5002:5000"
+    depends_on:
+      - mlflow
+    volumes:
+      - ./mlartifacts:/mlartifacts:rw
