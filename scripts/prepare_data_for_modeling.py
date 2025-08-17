@@ -9,7 +9,7 @@ OVERVIEW:
 ---------
 The script can operate in three modes:
 1. TRAIN MODE: Prepares training data and creates/saves the categorical encoder to MLflow
-2. QUERY MODE: Prepares new data for inference using a previously saved encoder  
+2. QUERY MODE: Prepares new data for inference using a specific hardcoded encoder  
 3. SUBSET MODE: Creates smaller subsets of training data for rapid prototyping
 
 DATA FLOW:
@@ -55,13 +55,16 @@ KEY BEHAVIORS:
 
 • Encoder Management:
     - TRAIN mode: Creates new encoder and saves to MLflow artifact store
-    - QUERY mode: Auto-fetches latest encoder from MLflow or uses specified run ID
-    - Encoder ensures consistent categorical transformations between train and inference
+    - QUERY mode: Uses HARDCODED encoder from run ID "58eccb619a3b45359b1e9bcd5b1c9a6d"
+    - This ensures consistent categorical transformations and allows the script to run
+      independently without requiring a previous training run
+    - The hardcoded encoder is always used to prevent conflicts from other experiments
 
 • MLflow Integration:
     - Connects to MLflow server at http://127.0.0.1:5001
-    - Uses "testing_setup" experiment (FIXME: make configurable)
+    - Uses "data_preparation" experiment (FIXME: make configurable)
     - Logs encoder artifacts for reproducible preprocessing
+    - QUERY mode always uses the specific encoder from run "58eccb619a3b45359b1e9bcd5b1c9a6d"
 
 PREPROCESSING STEPS:
 -------------------
@@ -87,6 +90,7 @@ uv run python scripts/prepare_data_for_modeling.py --train --data-version "exper
 uv run python scripts/prepare_data_for_modeling.py --query --data-version "experiment_v1"
 # → Loads: gdelt_events_experiment_v1_test.parquet
 # → Saves: data/intermediate/experiment_v1/X_query.parquet
+# → Uses: encoder from hardcoded run "58eccb619a3b45359b1e9bcd5b1c9a6d"
 
 # Cross-version inference: use different source and output versions
 uv run python scripts/prepare_data_for_modeling.py --query \
@@ -94,6 +98,7 @@ uv run python scripts/prepare_data_for_modeling.py --query \
     --source-data-version "2024_subset_10k"
 # → Loads: gdelt_events_2024_subset_10k_test.parquet  
 # → Saves: data/intermediate/new_experiment/X_query.parquet
+# → Uses: encoder from hardcoded run "58eccb619a3b45359b1e9bcd5b1c9a6d"
 
 # Custom data inference: prepare completely custom dataset
 uv run python scripts/prepare_data_for_modeling.py --query \
@@ -113,13 +118,13 @@ REQUIREMENTS:
 -------------
 • MLflow server running at http://127.0.0.1:5001
 • Source data files must exist in data/raw/ directory
-• For QUERY mode: At least one training run must exist to provide encoder
+• For QUERY mode: The hardcoded encoder run "58eccb619a3b45359b1e9bcd5b1c9a6d" must exist in MLflow
 • For SUBSET mode: Must be combined with --train flag
 
 ERROR HANDLING:
 ---------------
 • Missing source files: Lists available files in data/raw/
-• Missing encoder: Auto-searches recent MLflow runs for compatible encoder
+• Missing hardcoded encoder: Clear error message about the specific required run ID
 • Invalid combinations: Clear error messages for incompatible flag combinations
 
 OUTPUTS:
@@ -135,7 +140,7 @@ The dir name is subset_<subset_size>_<data_version>.
 So basically, if you want to prepare data for a new experiment called "my_experiment":
 1. Run with --train --data-version "my_experiment" to create the encoder
 2. Run with --query --data-version "my_experiment" to prepare test data
-3. Both will use the same categorical transformations for consistency
+3. Query mode will always use the same hardcoded encoder for consistency across all experiments
 
 For cross-experiment analysis, you can mix and match versions using --source-data-version
 to load from one experiment and save to another.
@@ -165,27 +170,12 @@ def save_series_as_parquet(series, filepath):
     df = series.to_frame(name=series.name if series.name else 'target')
     df.to_parquet(filepath)
 
-# helper function for getting the latest encoder run ID
-def get_latest_encoder_run_id(experiment_name="testing_setup"):
-    """Get the run ID of the most recent run that has an encoder artifact"""
-    experiment = mlflow.get_experiment_by_name(experiment_name)
-    runs = mlflow.search_runs(
-        experiment_ids=[experiment.experiment_id],
-        order_by=["start_time DESC"],
-        max_results=20
-    )
-    
-    for idx, run in runs.iterrows():
-        run_id = run['run_id']
-        try:
-            # Test if encoder exists (just list artifacts, don't download)
-            artifacts = mlflow.artifacts.list_artifacts(f"runs:/{run_id}/preprocessing")
-            if any('ordinal_encoder_prototype.pkl' in str(artifact) for artifact in artifacts):
-                return run_id
-        except:
-            continue
-    
-    raise ValueError("No encoder found in recent MLflow runs")
+# helper function for getting the hardcoded encoder run ID
+def get_hardcoded_encoder_run_id():
+    """Get the hardcoded run ID that contains the standard encoder artifact"""
+    # hardcoded run ID to ensure consistency across all experiments
+    # this prevents issues when running query mode after other experiments
+    return "58eccb619a3b45359b1e9bcd5b1c9a6d"
 
 # function for data preparation
 def prepare_data(
@@ -294,42 +284,34 @@ def prepare_data(
                     os.remove(encoder_path)
 
     elif is_train == False:
+        # always use the hardcoded encoder run ID for consistency
+        hardcoded_run_id = get_hardcoded_encoder_run_id()
+        
         # Determine which encoder to use
         if encoder is not None:
             loaded_encoder = encoder
         elif encoder_run_id is not None:
-            # Use specific run ID
+            # Use specific run ID (but log that we're overriding with hardcoded)
+            print(f"Note: Overriding provided run ID {encoder_run_id} with hardcoded run ID {hardcoded_run_id}")
             artifact_path = mlflow.artifacts.download_artifacts(
-                f"runs:/{encoder_run_id}/preprocessing/ordinal_encoder_prototype.pkl"
+                f"runs:/{hardcoded_run_id}/preprocessing/ordinal_encoder_prototype.pkl"
             )
             loaded_encoder = joblib.load(artifact_path)
             os.remove(artifact_path)
-        elif auto_fetch_encoder:
-            # Auto-fetch the most recent encoder
-            experiment = mlflow.get_experiment_by_name("testing_setup")
-            runs = mlflow.search_runs(
-                experiment_ids=[experiment.experiment_id],
-                order_by=["start_time DESC"],
-                max_results=20
-            )
-            
-            # Find the most recent run with preprocessing artifacts
-            for idx, run in runs.iterrows():
-                try:
-                    run_id = run['run_id']
-                    artifact_path = mlflow.artifacts.download_artifacts(
-                        f"runs:/{run_id}/preprocessing/ordinal_encoder_prototype.pkl"
-                    )
-                    loaded_encoder = joblib.load(artifact_path)
-                    os.remove(artifact_path)
-                    print(f"Using encoder from run: {run_id}")
-                    break
-                except:
-                    continue
-            else:
-                raise ValueError("No encoder found in recent MLflow runs")
         else:
-            raise ValueError("For test data, provide either 'encoder' object, 'encoder_run_id', or set 'auto_fetch_encoder=True'")
+            # Use hardcoded encoder run ID instead of auto-fetching
+            try:
+                artifact_path = mlflow.artifacts.download_artifacts(
+                    f"runs:/{hardcoded_run_id}/preprocessing/ordinal_encoder_prototype.pkl"
+                )
+                loaded_encoder = joblib.load(artifact_path)
+                os.remove(artifact_path)
+                print(f"Using hardcoded encoder from run: {hardcoded_run_id}")
+            except Exception as e:
+                raise ValueError(
+                    f"Could not load hardcoded encoder from run {hardcoded_run_id}. "
+                    f"Please ensure this run exists in MLflow. Error: {e}"
+                )
         
         # Apply the loaded encoder
         df[categorical_columns] = loaded_encoder.transform(df[categorical_columns])
@@ -434,7 +416,7 @@ def main(train, query, subset, subset_size=1000, data_version="2024_subset_10k",
     # set experiment
     #mlflow.set_experiment("gdelt-newsimpact")
     # FIXME: SET THE ACTUAL EXPERIMENT NAME INTERACTIVELY
-    mlflow.set_experiment("testing_setup")
+    mlflow.set_experiment("data_preparation")
 
     # Check if source files exist and provide helpful error messages
     if train and not PATH_TRAIN_SOURCE.exists():

@@ -34,7 +34,8 @@ __pycache__/
 # PostgreSQL persistent storage
 pgdata/
 # MLFlow artifacts
-mlartifacts/
+# UPDATE: no, I changed my mind and share it this time!
+#mlartifacts/
 
 # CatBoost training directory
 catboost_info/

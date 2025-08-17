@@ -1,0 +1,48 @@
+artifact_path: mlflow-artifacts:/2/models/m-54ad88dbea1c40139b5123ffaa9d4729/artifacts
+flavors:
+  python_function:
+    data: model.xgb
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.xgboost
+    python_version: 3.12.11
+  xgboost:
+    code: null
+    data: model.xgb
+    model_class: xgboost.sklearn.XGBRegressor
+    model_format: xgb
+    xgb_version: 3.0.4
+is_signature_from_type_hint: false
+mlflow_version: 3.2.0
+model_id: m-54ad88dbea1c40139b5123ffaa9d4729
+model_size_bytes: 1260942
+model_uuid: m-54ad88dbea1c40139b5123ffaa9d4729
+prompts: null
+run_id: 3fee05b9850444fb8bee07eb50632570
+saved_input_example_info:
+  artifact_path: input_example.json
+  pandas_orient: split
+  serving_input_path: serving_input_example.json
+  type: dataframe
+signature:
+  inputs: '[{"type": "double", "name": "EventCode", "required": true}, {"type": "double",
+    "name": "EventBaseCode", "required": true}, {"type": "double", "name": "EventRootCode",
+    "required": true}, {"type": "long", "name": "QuadClass", "required": true}, {"type":
+    "double", "name": "GoldsteinScale", "required": true}, {"type": "double", "name":
+    "Actor1Code", "required": true}, {"type": "double", "name": "Actor1Name", "required":
+    true}, {"type": "double", "name": "Actor1CountryCode", "required": true}, {"type":
+    "double", "name": "Actor2Code", "required": true}, {"type": "double", "name":
+    "Actor2Name", "required": true}, {"type": "double", "name": "Actor2CountryCode",
+    "required": true}, {"type": "double", "name": "ActionGeo_CountryCode", "required":
+    true}, {"type": "double", "name": "ActionGeo_ADM1Code", "required": true}, {"type":
+    "double", "name": "ActionGeo_Lat", "required": true}, {"type": "double", "name":
+    "ActionGeo_Long", "required": true}, {"type": "double", "name": "ActionGeo_FeatureID",
+    "required": true}, {"type": "integer", "name": "year", "required": true}, {"type":
+    "integer", "name": "month", "required": true}, {"type": "integer", "name": "day_of_year",
+    "required": true}, {"type": "integer", "name": "day_of_week", "required": true},
+    {"type": "long", "name": "is_weekend", "required": true}]'
+  outputs: '[{"type": "tensor", "tensor-spec": {"dtype": "float32", "shape": [-1]}}]'
+  params: null
+type_hint_from_example: false
+utc_time_created: '2025-08-17 16:37:53.914951'
