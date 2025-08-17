@@ -145,6 +145,11 @@ uv run python scripts/prepare_data_for_modeling.py --train --query --subset
 This will prepare the data for training and testing as well as a subset of the
 training data for rapid prototyping.
 
+## Model Development
+
+```bash
+uv run python scripts/develop_models.py
+```
 
 
 
@@ -197,6 +202,10 @@ Create a `.env` file with these variables:
 - `POSTGRES_PASSWORD` - Database password (choose a secure one)
 - `POSTGRES_DB` - `mlflow`
 
+## Further Software
 
+You also need this software, but it doesn't really belong to the project itself.
+Rather, it's some system dependency.
+- libomp
 
 

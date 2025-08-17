@@ -35,6 +35,7 @@ __pycache__/
 pgdata/
 # MLFlow artifacts
 # UPDATE: no, I changed my mind and share it this time!
+# but still not the db
 #mlartifacts/
 
 # CatBoost training directory
