@@ -25,7 +25,7 @@ overfitting on small datasets.
 Data Requirements:
 ------------------
 - X_train.parquet, y_train.parquet: Training features and targets
-- X_test.parquet, y_test.parquet: Test features and targets (or X_query/y_query)
+- X_query.parquet, y_query.parquet: Test features and targets (or X_query/y_query)
 
 MLflow Integration:
 -------------------
@@ -78,9 +78,7 @@ from mlflow.models.signature import infer_signature
 # Configuration
 # -------------
 print("\nSetting up workspace...")
-# FIXME: CHANGE BACK TO MAIN DATA VERSION
-DATA_VERSION = "subset_1000_2024_subset_10k"
-#DATA_VERSION = "2024_subset_10k"
+DATA_VERSION = "2024_subset_10k"
 N_FOLDS = 5
 N_TRIALS = 50  # lightweight HPO - increase for better results but longer runtime
 RANDOM_STATE = 42
@@ -92,20 +90,22 @@ PATH_DATA = PATH_REPO / "data" / "intermediate" / DATA_VERSION
 
 # MLflow setup
 mlflow.set_tracking_uri("http://127.0.0.1:5001")
-# FIXME: CHANGE BACK TO ACTUAL EXPERIMENT
-mlflow.set_experiment("boosting_models_cv_prototype")
-#mlflow.set_experiment("boosting_models_cv")
+mlflow.set_experiment("boosting_models_cv")
 
 # Load prepared data
 # -----------------
 print("\nLoading data...")
 X_train = pd.read_parquet(PATH_DATA / "X_train.parquet")
 y_train = pd.read_parquet(PATH_DATA / "y_train.parquet").squeeze()
-# FIXME: CHANGE BACK TO REAL TEST SET
-X_test = pd.read_parquet(PATH_DATA / "X_train.parquet")
-y_test = pd.read_parquet(PATH_DATA / "y_train.parquet").squeeze()
-#X_test = pd.read_parquet(PATH_DATA / "X_test.parquet")
-#y_test = pd.read_parquet(PATH_DATA / "y_test.parquet").squeeze()
+X_test = pd.read_parquet(PATH_DATA / "X_query.parquet")
+y_test = pd.read_parquet(PATH_DATA / "y_query.parquet").squeeze()
+
+# briefly validate that correct data was used by printing shape
+# this way, user can compare num rows to what they used as input
+print(f"X_train shape: {X_train.shape}")
+print(f"y_train shape: {y_train.shape}")
+print(f"X_test shape: {X_test.shape}")
+print(f"y_test shape: {y_test.shape}")
 
 # setup cross validation strategy
 cv_strategy = KFold(n_splits=N_FOLDS, shuffle=True, random_state=RANDOM_STATE)
@@ -219,7 +219,6 @@ def train_and_evaluate_final_model(
     y_test,
 ):
     """Train model and evaluate on test set"""
-    print(f"\nTraining final {model_name} model...")
     
     # fit on full training set
     model.fit(X_train, y_train)
@@ -243,7 +242,7 @@ def train_and_evaluate_final_model(
     print(f"{model_name} Test Results:")
     print(f"  RMSE: {rmse:.4f}")
     print(f"  MAE: {mae:.4f}")
-    print(f"  R²: {r2:.4f}")
+    print(f"  R²: {r2:.4f}\n")
     
     return model, metrics
 
@@ -269,7 +268,7 @@ results['XGBoost'] = {
 }
 
 # print best CV score and parameters for users
-print(f"Best XGBoost CV score: {study_xgb.best_value:.4f}")
+print(f"\nBest XGBoost CV score: {study_xgb.best_value:.4f}")
 print(f"Best XGBoost params:")
 for param, value in study_xgb.best_params.items():
     print(f"    {param}: {value}")
@@ -287,7 +286,7 @@ results['LightGBM'] = {
     'best_params': study_lgb.best_params
 }
 
-print(f"Best LightGBM CV score: {study_lgb.best_value:.4f}")
+print(f"\nBest LightGBM CV score: {study_lgb.best_value:.4f}")
 print(f"Best LightGBM params:")
 for param, value in study_lgb.best_params.items():
     print(f"    {param}: {value}")
@@ -305,7 +304,7 @@ results['CatBoost'] = {
     'best_params': study_cb.best_params
 }
 
-print(f"Best CatBoost CV score: {study_cb.best_value:.4f}")
+print(f"\nBest CatBoost CV score: {study_cb.best_value:.4f}")
 print(f"Best CatBoost params:")
 for param, value in study_cb.best_params.items():
     print(f"    {param}: {value}")
@@ -328,7 +327,6 @@ print(f"Best CV score: {results[best_model_name]['cv_score']:.4f}")
 # Train and evaluate ONLY the best model on test set
 # Log CV results of ALL models
 # --------------------------------------------------
-print(f"\nTraining final model: {best_model_name}")
 
 # model creation mapping
 model_creators = {
