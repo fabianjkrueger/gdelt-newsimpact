@@ -35,3 +35,8 @@ __pycache__/
 pgdata/
 # MLFlow artifacts
 mlartifacts/
+
+# CatBoost training directory
+catboost_info/
+*/catboost_info/
+*/catboost_info/*

@@ -1,6 +1,61 @@
-# MLOps Project 2: Boosting Models with 5-Fold CV and Lightweight HPO
-# ================================================================
+"""
+MLOps Project 2: Boosting Models Development with Cross-Validation and HPO
+==========================================================================
 
+This script performs hyperparameter optimization and model selection for
+regression tasks using three boosting algorithms: XGBoost, LightGBM, and
+CatBoost. It uses cross-validation for model selection and evaluates only the
+best model on the test set to avoid data leakage.
+
+Workflow:
+---------
+1. Loads preprocessed training and test data from parquet files
+2. Runs lightweight hyperparameter optimization (50 trials) for each algorithm
+using Optuna
+3. Selects the best model based on 5-fold cross-validation RMSE scores
+4. Trains only the winning model on the full training set
+5. Evaluates the final model on the test set
+6. Logs all experiments to MLflow with proper signatures and model registry
+integration
+
+The script is optimized for datasets with mostly categorical features
+(8k rows, 20 features) and uses adjusted hyperparameter search spaces to prevent
+overfitting on small datasets.
+
+Data Requirements:
+------------------
+- X_train.parquet, y_train.parquet: Training features and targets
+- X_test.parquet, y_test.parquet: Test features and targets (or X_query/y_query)
+
+MLflow Integration:
+-------------------
+- Logs CV-only runs for non-winning models
+- Logs full results (CV + test metrics + model artifact) for the best model
+- Registers the best model to MLflow Model Registry with alias "cyber_dragon"
+- Includes model signatures and input examples for deployment readiness
+
+Coding Style:
+-------------
+I didn't refactor or parametrize the code in this script too much, because this
+is a clearly defined experiment and I won't run this with other parameters.
+It's a specialized tool rather than a general purpose pipeline, so keeping it
+simple and focused is preferred.
+Adding arguments or refactoring everything into functions would add complexity
+without clear benefits in this case, so I will keep it like this.
+
+Usage:
+------
+0. Have the data prepared and in the right place. Just follow the instructions
+from the README for this
+1. Ensure MLflow server is running: mlflow server --host 127.0.0.1 --port 5001
+2. Run the script: `uv run scripts/develop_models.py` (no parameters)
+3. Check results in MLflow UI: http://127.0.0.1:5001
+"""
+
+print("\nStarting development of boosting models...")
+# Dependencies
+# ------------
+print("\nLoading libraries...")
 import pandas as pd
 import numpy as np
 import mlflow
@@ -8,6 +63,7 @@ import mlflow.sklearn
 import mlflow.xgboost
 import mlflow.lightgbm
 import mlflow.catboost
+from mlflow.tracking import MlflowClient
 from pathlib import Path
 import optuna
 from sklearn.model_selection import cross_val_score, KFold
@@ -17,86 +73,88 @@ import lightgbm as lgb
 import catboost as cb
 import warnings
 warnings.filterwarnings('ignore')
+from mlflow.models.signature import infer_signature
 
 # Configuration
 # -------------
-print("Setting up workspace...")
-DATA_VERSION = "2024_subset_10k"  # adjust to your data version
+print("\nSetting up workspace...")
+# FIXME: CHANGE BACK TO MAIN DATA VERSION
+DATA_VERSION = "subset_1000_2024_subset_10k"
+#DATA_VERSION = "2024_subset_10k"
 N_FOLDS = 5
 N_TRIALS = 50  # lightweight HPO - increase for better results but longer runtime
 RANDOM_STATE = 42
 METRIC = 'rmse'  # primary metric for optimization
 
 # Paths
-PATH_REPO = Path.cwd().parent if Path.cwd().name == 'notebooks' else Path.cwd()
+PATH_REPO = Path(__file__).parent.parent
 PATH_DATA = PATH_REPO / "data" / "intermediate" / DATA_VERSION
 
 # MLflow setup
 mlflow.set_tracking_uri("http://127.0.0.1:5001")
-mlflow.set_experiment("boosting_models_cv")
+# FIXME: CHANGE BACK TO ACTUAL EXPERIMENT
+mlflow.set_experiment("boosting_models_cv_prototype")
+#mlflow.set_experiment("boosting_models_cv")
 
 # Load prepared data
 # -----------------
-print("Loading data...")
+print("\nLoading data...")
 X_train = pd.read_parquet(PATH_DATA / "X_train.parquet")
 y_train = pd.read_parquet(PATH_DATA / "y_train.parquet").squeeze()
-X_test = pd.read_parquet(PATH_DATA / "X_query.parquet")  
-y_test = pd.read_parquet(PATH_DATA / "y_query.parquet").squeeze()
+# FIXME: CHANGE BACK TO REAL TEST SET
+X_test = pd.read_parquet(PATH_DATA / "X_train.parquet")
+y_test = pd.read_parquet(PATH_DATA / "y_train.parquet").squeeze()
+#X_test = pd.read_parquet(PATH_DATA / "X_test.parquet")
+#y_test = pd.read_parquet(PATH_DATA / "y_test.parquet").squeeze()
 
 # setup cross validation strategy
 cv_strategy = KFold(n_splits=N_FOLDS, shuffle=True, random_state=RANDOM_STATE)
 
 # Lightweight hyperparameter search spaces
 # ----------------------------------------
-print("Setting up hyperparameter search spaces...")
+# Data has just 8k rows for training and mostly categorical features
+# Use smaller space and enable categorical handling in XGBoost
+print("\nSetting up hyperparameter search spaces...")
 def get_xgboost_search_space(trial):
-    """Lightweight XGBoost hyperparameter space"""
+    """Optimized for 8k rows, 20 features, categorical data"""
     return {
-        'n_estimators': trial.suggest_int('n_estimators', 100, 500),
-        'max_depth': trial.suggest_int('max_depth', 3, 8),
+        'n_estimators': trial.suggest_int('n_estimators', 50, 300),
+        'max_depth': trial.suggest_int('max_depth', 3, 6),
         'learning_rate': trial.suggest_float(
             'learning_rate', 0.01, 0.3, log=True,
         ),
-        'subsample': trial.suggest_float(
-            'subsample', 0.7, 1.0,
-        ),
-        'colsample_bytree': trial.suggest_float(
-            'colsample_bytree', 0.7, 1.0,
-        ),
-        'reg_alpha': trial.suggest_float('reg_alpha', 1e-8, 10.0, log=True),
-        'reg_lambda': trial.suggest_float(
-            'reg_lambda', 1e-8, 10.0, log=True,
-        ),
+        'subsample': trial.suggest_float('subsample', 0.8, 1.0),
+        'colsample_bytree': trial.suggest_float('colsample_bytree', 0.7, 1.0),
+        'reg_alpha': trial.suggest_float('reg_alpha', 0.01, 3.0, log=True),
+        'reg_lambda': trial.suggest_float('reg_lambda', 0.1, 5.0, log=True),
         'random_state': RANDOM_STATE,
+        'tree_method': 'hist',
+        'enable_categorical': True,
     }
 
 def get_lightgbm_search_space(trial):
-    """Lightweight LightGBM hyperparameter space"""
+    """Optimized for categorical GDELT data"""
     return {
-        'n_estimators': trial.suggest_int('n_estimators', 100, 500),
-        'max_depth': trial.suggest_int('max_depth', 3, 8),
+        'n_estimators': trial.suggest_int('n_estimators', 50, 300),
+        'max_depth': trial.suggest_int('max_depth', 3, 6),
         'learning_rate': trial.suggest_float(
             'learning_rate', 0.01, 0.3, log=True,
         ),
-        'subsample': trial.suggest_float('subsample', 0.7, 1.0),
-        'colsample_bytree': trial.suggest_float(
-            'colsample_bytree', 0.7, 1.0,
-        ),
-        'reg_alpha': trial.suggest_float(
-            'reg_alpha', 1e-8, 10.0, log=True,
-        ),
-        'reg_lambda': trial.suggest_float('reg_lambda', 1e-8, 10.0, log=True),
-        'num_leaves': trial.suggest_int('num_leaves', 20, 200),
-        'min_child_samples': trial.suggest_int('min_child_samples', 5, 50),
+        'num_leaves': trial.suggest_int('num_leaves', 15, 80),
+        'min_child_samples': trial.suggest_int('min_child_samples', 10, 50),
+        'subsample': trial.suggest_float('subsample', 0.8, 1.0),
+        'colsample_bytree': trial.suggest_float('colsample_bytree', 0.7, 1.0),
+        'reg_alpha': trial.suggest_float('reg_alpha', 0.01, 3.0, log=True),
+        'reg_lambda': trial.suggest_float('reg_lambda', 0.1, 5.0, log=True),
         'random_state': RANDOM_STATE,
-        'verbose': -1
+        'verbose': -1,
     }
 
 def get_catboost_search_space(trial):
     """Lightweight CatBoost hyperparameter space"""
     return {
-        'iterations': trial.suggest_int('iterations', 100, 500),
-        'depth': trial.suggest_int('depth', 3, 8),
+        'iterations': trial.suggest_int('iterations', 100, 400),
+        'depth': trial.suggest_int('depth', 4, 8),
         'learning_rate': trial.suggest_float(
             'learning_rate', 0.01, 0.3, log=True,
         ),
@@ -105,10 +163,11 @@ def get_catboost_search_space(trial):
             'bootstrap_type', ['Bayesian', 'Bernoulli'],
         ),
         'random_seed': RANDOM_STATE,
-        'verbose': False
+        'verbose': False,
+        'allow_writing_files': False,
     }
 
-print("Defining functions...")
+print("\nDefining functions...")
 
 # Cross-validation evaluation function
 # -----------------------------------
@@ -188,163 +247,168 @@ def train_and_evaluate_final_model(
     
     return model, metrics
 
-# Main training pipeline
-# ---------------------
 
-print("\n" + "="*60)
-print("STARTING BOOSTING MODELS TRAINING WITH 5-FOLD CV")
-print("="*60)
+# Cross validation for HPO and determining best model
+# ---------------------------------------------------
+print("\nStarting cross validation for HPO and determining best model...")
 
 results = {}
 
 # 1. XGBoost
-print(f"\n{'='*20} XGBOOST {'='*20}")
+print("\n❌XGBoost❌")
 print("Running hyperparameter optimization...")
 
-# minimize, because we use regression, and metrics are good when low
+# minimize function, because we use regression, and metrics are good when low
 study_xgb = optuna.create_study(direction='minimize')
 study_xgb.optimize(xgboost_objective, n_trials=N_TRIALS, show_progress_bar=True)
 
-print(f"Best XGBoost CV score: {study_xgb.best_value:.4f}")
-print(f"Best XGBoost params: {study_xgb.best_params}")
-
-# train final XGBoost model
-best_params_xgb = study_xgb.best_params
-best_xgb = xgb.XGBRegressor(**best_params_xgb)
-
-with mlflow.start_run(run_name="xgboost_cv"):
-    # log hyperparameters
-    mlflow.log_params(best_params_xgb)
-    mlflow.log_param("cv_folds", N_FOLDS)
-    mlflow.log_param("n_trials", N_TRIALS)
-    mlflow.log_metric("cv_score", study_xgb.best_value)
-    
-    # train and evaluate
-    model_xgb, metrics_xgb = train_and_evaluate_final_model(
-        "XGBoost",
-        best_xgb,
-        X_train,
-        y_train,
-        X_test,
-        y_test,
-    )
-    
-    # log metrics and model
-    mlflow.log_metrics(metrics_xgb)
-    mlflow.xgboost.log_model(model_xgb, "model")
-
+# store results for later use
 results['XGBoost'] = {
     'cv_score': study_xgb.best_value,
-    'test_metrics': metrics_xgb,
-    'best_params': best_params_xgb
+    'best_params': study_xgb.best_params
 }
 
+# print best CV score and parameters for users
+print(f"Best XGBoost CV score: {study_xgb.best_value:.4f}")
+print(f"Best XGBoost params:")
+for param, value in study_xgb.best_params.items():
+    print(f"    {param}: {value}")
+
+
 # 2. LightGBM
-print(f"\n{'='*20} LIGHTGBM {'='*20}")
+print("\n⚡️LightGBM⚡️")
 print("Running hyperparameter optimization...")
 
 study_lgb = optuna.create_study(direction='minimize')
 study_lgb.optimize(lightgbm_objective, n_trials=N_TRIALS, show_progress_bar=True)
 
-print(f"Best LightGBM CV score: {study_lgb.best_value:.4f}")
-print(f"Best LightGBM params: {study_lgb.best_params}")
-
-# train final LightGBM model
-best_params_lgb = study_lgb.best_params
-best_lgb = lgb.LGBMRegressor(**best_params_lgb)
-
-with mlflow.start_run(run_name="lightgbm_cv"):
-    # log hyperparameters
-    mlflow.log_params(best_params_lgb)
-    mlflow.log_param("cv_folds", N_FOLDS)
-    mlflow.log_param("n_trials", N_TRIALS)
-    mlflow.log_metric("cv_score", study_lgb.best_value)
-    
-    # train and evaluate
-    model_lgb, metrics_lgb = train_and_evaluate_final_model(
-        "LightGBM",
-        best_lgb,
-        X_train,
-        y_train,
-        X_test,
-        y_test,
-    )
-    
-    # log metrics and model
-    mlflow.log_metrics(metrics_lgb)
-    mlflow.lightgbm.log_model(model_lgb, "model")
-
 results['LightGBM'] = {
     'cv_score': study_lgb.best_value,
-    'test_metrics': metrics_lgb,
-    'best_params': best_params_lgb
+    'best_params': study_lgb.best_params
 }
 
+print(f"Best LightGBM CV score: {study_lgb.best_value:.4f}")
+print(f"Best LightGBM params:")
+for param, value in study_lgb.best_params.items():
+    print(f"    {param}: {value}")
+
+
 # 3. CatBoost
-print(f"\n{'='*20} CATBOOST {'='*20}")
+print("\n🐱CatBoost🐱")
 print("Running hyperparameter optimization...")
 
 study_cb = optuna.create_study(direction='minimize')
 study_cb.optimize(catboost_objective, n_trials=N_TRIALS, show_progress_bar=True)
 
-print(f"Best CatBoost CV score: {study_cb.best_value:.4f}")
-print(f"Best CatBoost params: {study_cb.best_params}")
-
-# train final CatBoost model
-best_params_cb = study_cb.best_params
-best_cb = cb.CatBoostRegressor(**best_params_cb)
-
-with mlflow.start_run(run_name="catboost_cv"):
-    # log hyperparameters
-    mlflow.log_params(best_params_cb)
-    mlflow.log_param("cv_folds", N_FOLDS)
-    mlflow.log_param("n_trials", N_TRIALS)
-    mlflow.log_metric("cv_score", study_cb.best_value)
-    
-    # train and evaluate
-    model_cb, metrics_cb = train_and_evaluate_final_model(
-        "CatBoost",
-        best_cb,
-        X_train,
-        y_train,
-        X_test,
-        y_test,
-    )
-    
-    # log metrics and model
-    mlflow.log_metrics(metrics_cb)
-    mlflow.catboost.log_model(model_cb, "model")
-
 results['CatBoost'] = {
     'cv_score': study_cb.best_value,
-    'test_metrics': metrics_cb,
-    'best_params': best_params_cb
+    'best_params': study_cb.best_params
 }
 
-# Final comparison
-# ---------------
-print(f"\n{'='*20} FINAL RESULTS {'='*20}")
+print(f"Best CatBoost CV score: {study_cb.best_value:.4f}")
+print(f"Best CatBoost params:")
+for param, value in study_cb.best_params.items():
+    print(f"    {param}: {value}")
 
+
+# Final comparison and model selection
+# -----------------------------------
+print("\nFinal comparison on cross validation results...")
+
+# print all CV scores
 print("\nCross-Validation RMSE:")
 for model_name, result in results.items():
     print(f"  {model_name}: {result['cv_score']:.4f}")
 
-print("\nTest Set RMSE:")
+# find best model based on CV score
+best_model_name = min(results.keys(), key=lambda x: results[x]['cv_score'])
+print(f"\nBest model (based on CV): {best_model_name}")
+print(f"Best CV score: {results[best_model_name]['cv_score']:.4f}")
+
+# Train and evaluate ONLY the best model on test set
+# Log CV results of ALL models
+# --------------------------------------------------
+print(f"\nTraining final model: {best_model_name}")
+
+# model creation mapping
+model_creators = {
+    'XGBoost': lambda params: xgb.XGBRegressor(**params),
+    'LightGBM': lambda params: lgb.LGBMRegressor(**params),
+    'CatBoost': lambda params: cb.CatBoostRegressor(**params)
+}
+
+# mlflow logging functions
+mlflow_loggers = {
+    'XGBoost': mlflow.xgboost.log_model,
+    'LightGBM': mlflow.lightgbm.log_model,
+    'CatBoost': mlflow.catboost.log_model
+}
+
+# Log CV results for all models, PLUS test metrics for the best one
+print("\nLogging results to MLflow...")
+client = MlflowClient()
+
 for model_name, result in results.items():
-    rmse = result['test_metrics']['test_rmse']
-    print(f"  {model_name}: {rmse:.4f}")
+    is_best = (model_name == best_model_name)
+    run_name = f"{model_name.lower()}_{'final' if is_best else 'cv_only'}"
+    
+    with mlflow.start_run(run_name=run_name):
+        # Always log CV results
+        mlflow.log_params(result['best_params'])
+        mlflow.log_param("cv_folds", N_FOLDS)
+        mlflow.log_param("n_trials", N_TRIALS)
+        mlflow.log_metric("cv_score", result['cv_score'])
+        mlflow.log_param("is_final_model", is_best)
+        
+        # For best model: also train and log test results + model artifact
+        if is_best:
+            print(f"\nTraining and evaluating final model: {model_name}")
+            
+            # create and train the model
+            best_model = model_creators[model_name](result['best_params'])
+            final_model, test_metrics = train_and_evaluate_final_model(
+                model_name, best_model, X_train, y_train, X_test, y_test
+            )
+            
+            # log test metrics
+            mlflow.log_metrics(test_metrics)
+            
+            # create signature and input example
+            signature = infer_signature(X_train, final_model.predict(X_train))
+            input_example = X_train.head(3)
+            
+            # log and register model simultaneously
+            model_info = mlflow_loggers[model_name](
+                final_model, 
+                name="model",
+                signature=signature,
+                input_example=input_example,
+                registered_model_name="gdelt-event-classifier"
+            )
+            
+            # manage mobel name, because staging is deprecated
+            model_version = model_info.registered_model_version
+            client.set_registered_model_alias(
+                name="gdelt-event-classifier",
+                alias="cyber_dragon",
+                version=model_version
+            )
+            
+            # add metadata
+            client.update_model_version(
+                name="gdelt-event-classifier",
+                version=model_version,
+                description=(
+                    f"Best {model_name} model. "
+                    f"CV RMSE: {result['cv_score']:.4f}, "
+                    f"Test RMSE: {test_metrics['test_rmse']:.4f}"
+                )
+            )
+            
+            print(
+                f"Model registered as 'gdelt-event-classifier' v{model_version} "
+                f"with alias 'cyber_dragon'"
+            )
 
-# find best model
-best_model_cv = min(results.keys(), key=lambda x: results[x]['cv_score'])
-best_model_test = min(
-    results.keys(),
-    key=lambda x: results[x]['test_metrics']['test_rmse'],
-)
-
-print(f"\nBest model (CV): {best_model_cv}")
-print(f"Best model (Test): {best_model_test}")
-
-print(
-    "\nTraining completed! ",
-    "Check MLflow UI at http://127.0.0.1:5001 for detailed results.",
-)
+print(f"\nTraining completed! Check MLflow UI at http://127.0.0.1:5001")
+print(f"Model Registry: http://127.0.0.1:5001/#/models/gdelt-event-classifier")
