@@ -136,6 +136,19 @@ I will use a 80:20 split for training and testing.
 This will leave me with 8k rows for training and 2k rows for testing.
 For development, I will use 5-fold cross validation.
 
+## Data Preparation
+
+```bash
+uv run python scripts/prepare_data_for_modeling.py --train --query --subset
+```
+
+This will prepare the data for training and testing as well as a subset of the
+training data for rapid prototyping.
+
+
+
+
+
 
 
 # MLflow Docker Setup
