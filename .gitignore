@@ -32,7 +32,7 @@ __pycache__/
 # I *may* change this, because it could be relevant for passing the course
 # but the files are large, and I wouldn't usually track this
 # PostgreSQL persistent storage
-pgdata/
+#pgdata/
 # MLFlow artifacts
 # UPDATE: no, I changed my mind and share it this time!
 #mlartifacts/

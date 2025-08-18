@@ -127,20 +127,9 @@ def safe_gdelt_query(
         Actor1Code,
         Actor1Name,
         Actor1CountryCode,
-        Actor1Type1Code,
-        Actor1Type2Code,
-        Actor1Type3Code,
-        Actor2Code,
-        Actor2Name,
-        Actor2CountryCode,
-        Actor2Type1Code,
-        Actor2Type2Code,
-        Actor2Type3Code,
         ActionGeo_CountryCode,
-        ActionGeo_ADM1Code,
         ActionGeo_Lat,
         ActionGeo_Long,
-        ActionGeo_FeatureID,
         NumArticles             -- target variable
     FROM `gdelt-bq.gdeltv2.events`
     WHERE SQLDATE >= {start_gdelt}  -- start date
@@ -152,7 +141,7 @@ def safe_gdelt_query(
             ABS(FARM_FINGERPRINT(
                 CONCAT(
                     CAST(SQLDATE AS STRING),
-                    CAST(EventBaseCode AS STRING),
+                    CAST(EventCode AS STRING),
                     CAST({seed} AS STRING)  -- Include seed in hash
                 )
             )), 

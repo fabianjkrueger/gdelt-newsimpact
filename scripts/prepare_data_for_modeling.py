@@ -96,7 +96,7 @@ uv run python scripts/prepare_data_for_modeling.py --query --data-version "exper
 uv run python scripts/prepare_data_for_modeling.py --query \
     --data-version "new_experiment" \
     --source-data-version "2024_subset_10k"
-# → Loads: gdelt_events_2024_subset_10k_test.parquet  
+# → Loads from: gdelt_events_2024_subset_10k_test.parquet  
 # → Saves: data/intermediate/new_experiment/X_query.parquet
 # → Uses: encoder from hardcoded run "58eccb619a3b45359b1e9bcd5b1c9a6d"
 
@@ -175,15 +175,12 @@ def get_hardcoded_encoder_run_id():
     """Get the hardcoded run ID that contains the standard encoder artifact"""
     # hardcoded run ID to ensure consistency across all experiments
     # this prevents issues when running query mode after other experiments
-    return "58eccb619a3b45359b1e9bcd5b1c9a6d"
+    return "5664a4bf4d274268bdcf7694267abbcb"
 
 # function for data preparation
 def prepare_data(
     df: pd.DataFrame,
     is_train: bool,
-    encoder: Optional[OrdinalEncoder] = None,
-    encoder_run_id: Optional[str] = None,
-    auto_fetch_encoder: bool = True,
     save_data: bool = False,
     save_path_dir: Optional[str] = None,
     path_repo: Optional[str] = None,
@@ -196,11 +193,6 @@ def prepare_data(
         df: The dataframe to prepare.
         is_train: If True, prepares data for training. If False, prepares data
         for testing.
-        encoder: If provided, uses this encoder to transform the data.
-        encoder_run_id: If provided, uses this run ID to locate the encoder in
-        the artifact store.
-        auto_fetch_encoder: If True, automatically fetches the most recent
-        encoder from the artifact store.
         save_data: If True, saves the data to the artifact store.
         save_path_dir: If provided, saves the data to this directory.
         path_repo: If provided, uses this path to save the data.
@@ -210,11 +202,10 @@ def prepare_data(
     Returns:
         X: The features.
         y: The labels.
-        encoder: The encoder.
+        (encoder): The encoder (only returned for training mode).
 
     Raises:
-        ValueError: If no encoder is found in the artifact store and
-        auto_fetch_encoder is False.
+        ValueError: If hardcoded encoder cannot be loaded for inference mode.
     """
     
     # Constants
@@ -224,27 +215,71 @@ def prepare_data(
     if save_data == True:
         PATH_DATA = Path(path_repo) / "data/intermediate"
 
-    # Handle missing values
-    missing_rates = df.isnull().mean()
-    columns_high_missing = missing_rates[missing_rates >= 0.5].index.tolist()
-    df = df.drop(columns=columns_high_missing)
-
-    # automatically identify column types
-    numerical_columns = df.select_dtypes(
-        include=['int64', 'float64']
-    ).columns.tolist()
-    categorical_columns = df.select_dtypes(
-        include=['object', 'string']
-    ).columns.tolist()
+    # schema definition for consistency
+    expected_columns = [
+        # numerical columns (including target)
+        "SQLDATE", "MonthYear", "QuadClass", "GoldsteinScale", 
+        "ActionGeo_Lat", "ActionGeo_Long", "NumArticles",
+        
+        # categorical columns  
+        "EventCode", "EventBaseCode", "EventRootCode",
+        "Actor1Code", "Actor1Name", "Actor1CountryCode", 
+        "ActionGeo_CountryCode"
+    ]
     
-    # create imputation strategy dynamically
-    imputation_strategy = {}
-    for col in categorical_columns:
-        imputation_strategy[col] = "UNKNOWN"
-    for col in numerical_columns:
-        imputation_strategy[col] = 999
+    # verify all expected columns are present
+    missing_cols = [col for col in expected_columns if col not in df.columns]
+    if missing_cols:
+        # add missing columns with NaN values as a safety net
+        print(f"WARNING: GDELT schema change detected!")
+        print(f"Adding missing columns with NaN values: {missing_cols}")
+        print(f"Available columns in data: {list(df.columns)}")
+        print(f"This may impact model performance - consider updating the pipeline")
+        
+        for col in missing_cols:
+            # use appropriate NA type based on expected column type
+            if col in categorical_columns:
+                df[col] = pd.NA  # will be filled with "UNKNOWN" later
+            else:
+                df[col] = pd.NA  # will be filled with 999 later
+    
+    # select only expected columns (removes any extra columns)
+    df = df[expected_columns].copy()
+    
+    # hardcoded column type definitions
+    categorical_columns = [
+        "EventCode", "EventBaseCode", "EventRootCode",
+        "Actor1Code", "Actor1Name", "Actor1CountryCode", 
+        "ActionGeo_CountryCode"
+    ]
+    
+    numerical_columns = [
+        "SQLDATE", "MonthYear", "QuadClass", "GoldsteinScale", 
+        "ActionGeo_Lat", "ActionGeo_Long", "NumArticles"
+    ]
+    
+    # imputation strategy (hardcoded for consistency)
+    imputation_strategy = {
+        # categorical: unknown value
+        "EventCode": "UNKNOWN",
+        "EventBaseCode": "UNKNOWN", 
+        "EventRootCode": "UNKNOWN",
+        "Actor1Code": "UNKNOWN",
+        "Actor1Name": "UNKNOWN",
+        "Actor1CountryCode": "UNKNOWN",
+        "ActionGeo_CountryCode": "UNKNOWN",
+        
+        # numerical: out-of-range value
+        "SQLDATE": 99999999,
+        "MonthYear": 999999,
+        "QuadClass": 999,
+        "GoldsteinScale": 999.0,
+        "ActionGeo_Lat": 999.0,
+        "ActionGeo_Long": 999.0,
+        "NumArticles": 999  # shouldn't have missing values, but just in case
+    }
 
-    # fill missing values with strategy
+    # fill missing values
     df.fillna(imputation_strategy, inplace=True)
 
     # Handle time and data columns
@@ -284,36 +319,25 @@ def prepare_data(
                     os.remove(encoder_path)
 
     elif is_train == False:
-        # always use the hardcoded encoder run ID for consistency
+        # for inference/query mode, ALWAYS use the hardcoded encoder for consistency
         hardcoded_run_id = get_hardcoded_encoder_run_id()
         
-        # Determine which encoder to use
-        if encoder is not None:
-            loaded_encoder = encoder
-        elif encoder_run_id is not None:
-            # Use specific run ID (but log that we're overriding with hardcoded)
-            print(f"Note: Overriding provided run ID {encoder_run_id} with hardcoded run ID {hardcoded_run_id}")
+        # load the hardcoded encoder
+        try:
             artifact_path = mlflow.artifacts.download_artifacts(
                 f"runs:/{hardcoded_run_id}/preprocessing/ordinal_encoder_prototype.pkl"
             )
             loaded_encoder = joblib.load(artifact_path)
             os.remove(artifact_path)
-        else:
-            # Use hardcoded encoder run ID instead of auto-fetching
-            try:
-                artifact_path = mlflow.artifacts.download_artifacts(
-                    f"runs:/{hardcoded_run_id}/preprocessing/ordinal_encoder_prototype.pkl"
-                )
-                loaded_encoder = joblib.load(artifact_path)
-                os.remove(artifact_path)
-                print(f"Using hardcoded encoder from run: {hardcoded_run_id}")
-            except Exception as e:
-                raise ValueError(
-                    f"Could not load hardcoded encoder from run {hardcoded_run_id}. "
-                    f"Please ensure this run exists in MLflow. Error: {e}"
-                )
+            print(f"Using hardcoded encoder from run: {hardcoded_run_id}")
+        except Exception as e:
+            raise ValueError(
+                f"Could not load hardcoded encoder from run {hardcoded_run_id}. "
+                f"Please ensure this run exists in MLflow and contains the encoder artifact. "
+                f"Error: {e}"
+            )
         
-        # Apply the loaded encoder
+        # apply the encoder to categorical columns only
         df[categorical_columns] = loaded_encoder.transform(df[categorical_columns])
 
     # Extract features and labels
@@ -470,7 +494,6 @@ def main(train, query, subset, subset_size=1000, data_version="2024_subset_10k",
         X_query, y_query = prepare_data(
             df=df_query,
             is_train=False,
-            auto_fetch_encoder=True,
             save_data=True,
             save_path_dir=data_version,  # Save with output version name
             path_repo=PATH_REPO
@@ -504,8 +527,3 @@ def main(train, query, subset, subset_size=1000, data_version="2024_subset_10k",
 # -----
 if __name__ == "__main__":
     main()
-
-
-
-
-
