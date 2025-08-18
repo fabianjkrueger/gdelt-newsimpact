@@ -9,9 +9,9 @@ Second project for DataTalksClub MLOps Zoomcamp
 
 ```bash
 # clone the repository
-git clone git@github.com:fabianjkrueger/mlopsproject2.git
+git clone git@github.com:fabianjkrueger/gdelt-newsimpact.git
 # navigate to the project directory
-cd mlopsproject2
+cd gdelt-newsimpact
 ```
 
 ### Get the Environment

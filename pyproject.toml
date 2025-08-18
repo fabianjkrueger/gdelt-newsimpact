@@ -1,5 +1,5 @@
 [project]
-name = "mlopsproject2"
+name = "gdelt-newsimpact"
 version = "0.1.0"
 description = "Project number 2 for DataTalksClub MLOps Zoomcamp"
 readme = "README.md"
@@ -14,11 +14,13 @@ dependencies = [
     "google-cloud-bigquery>=3.35.1",
     "pandas-gbq>=0.29.2",
     "python-dotenv>=1.1.1",
-    "click>=8.2.1",
     "xgboost>=3.0.4",
     "lightgbm>=4.6.0",
     "catboost>=1.2.8",
     "optuna>=4.4.0",
     "matplotlib>=3.10.5",
     "seaborn>=0.13.2",
+    "prefect>=2.20.0,<3.0.0",
+    "prefect-docker>=0.5.5",
+    "prefect-shell>=0.2.6",
 ]
