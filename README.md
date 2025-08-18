@@ -1,245 +1,105 @@
 # gdelt-newsimpact
-Second project for DataTalksClub MLOps Zoomcamp
+
+MLOps project predicting news media coverage from GDELT event data.
+
+## Problem Description
+
+This project predicts **NumArticles** - the count of unique news articles that report on events tracked by GDELT. 
+
+### What is NumArticles?
+
+NumArticles represents the scope and intensity of media coverage for global events. It's a real-world signal of an event's newsworthiness, capturing how many unique news articles report on a particular event. Each article is counted only once, regardless of how many times the event is mentioned within it or which outlet publishes it.
+
+NumArticles is distinct from other media metrics:
+- **NumMentions**: Could be inflated by repeated reporting or commentary
+- **NumSources**: Describes coverage diversity rather than volume
+
+High NumArticles typically indicates events considered globally or regionally significant, urgent, or especially fit for public consumption.
+
+### Problem Value
+
+By predicting NumArticles from event attributes, we answer questions like:
+- "Given who is involved, what the event is, and where it takes place, how widespread will the news coverage be?"
+- "Which kinds of events will turn into major talking points the moment they happen?"
+- "Does the origin (actors or geography) or timing of an event affect its likelihood of getting more reporting?"
+
+**Applications:**
+- **Media Impact Forecasting**: Organizations can anticipate stories requiring rapid response or public relations resources
+- **Event Prioritization**: Governments, NGOs, and journalists can predict which incidents will dominate news cycles
+- **Trend Analysis**: Researchers can investigate patterns in what makes news "go viral" or why some events get under-reported
+- **Early Warning Systems**: Proactive management of communication, resources, or interventions for expected high-profile events
+- **Understanding Bias**: Explore why certain regions, actor groups, or event types get more attention
+
+### Features
+
+The model uses intrinsic event characteristics (not downstream media outcomes):
+
+- **Event Type & Impact**: EventCode, QuadClass, GoldsteinScale - defines what happened and its significance
+- **Actor Details**: Actor1/2 codes, names, countries, types - identifies prominent participants
+- **Location Info**: Country codes, lat/long, administrative regions - regional context affects coverage
+- **Timing Features**: Date, day of week, seasonality - captures news cycles and timing effects
 
 ## Setup
 
-### Get the Code
+### Requirements
+- Docker
+- Python 3.12+ with uv
+- Google Cloud CLI
 
-1. Clone the repository:
+### Installation
 
+1. Clone and setup environment:
 ```bash
-# clone the repository
 git clone git@github.com:fabianjkrueger/gdelt-newsimpact.git
-# navigate to the project directory
 cd gdelt-newsimpact
-```
 
-### Get the Environment
-
-This project uses uv for Python dependency management.
-
-#### Install uv (macOS/Linux)
-
-```bash
-# install uv on macOS or Linux
+# install uv (macOS/Linux)
 curl -LsSf https://astral.sh/uv/install.sh | sh
-```
 
-For Windows, see the [uv installation guide](https://docs.astral.sh/uv/getting-started/installation/) or use WSL.
-
-#### Create and activate the environment
-
-```bash
-# install the dependencies
+# install dependencies
 uv sync
-
-# activate the environment
 source .venv/bin/activate
 ```
 
-The environment will automatically use Python 3.12 and install all required dependencies as specified in `pyproject.toml`.
-
-## Setup Instructions
-
-1. Copy the environment template:
-   ```bash
-   cp .env.example .env
-   ```
-
-2. Edit `.env` and set your unique project ID:
-   ```env
-   GOOGLE_CLOUD_PROJECT=mlops-zoomcamp-yourname
-   ```
-
-3. Run the setup script:
-   ```bash
-   chmod +x scripts/setup_gcloud.sh
-   ./scripts/setup_gcloud.sh
-   ```
-
-**Note**: Choose a globally unique project ID. If your chosen name is taken, try adding your initials or random numbers.
-
-## Build Docker Compose
-
-You already need the Docker compose at this point, because data preparation
-logs the ordinal encoder as an artifact.
-
+2. Configure Google Cloud:
 ```bash
-# first time setup or if you changed anything (builds images)
+cp .env.example .env
+# edit .env and set GOOGLE_CLOUD_PROJECT=your-unique-project-id
+chmod +x scripts/setup_gcloud.sh
+./scripts/setup_gcloud.sh
+```
+
+3. Start services:
+```bash
 docker-compose up --build -d
-
-# subsequent starts (uses existing images)
-docker-compose up -d
-
-# stop the services
-docker-compose down
 ```
 
+## Usage
 
+### Data Pipeline
 
-
-## Data
-
-### Get the Data
+The entire pipeline is orchestrated using **Prefect** and deployed in Docker containers:
 
 ```bash
+# download data from BigQuery
 uv run python scripts/download_data_with_BigQuery.py
-```
 
-
-I will just check if I can get some usable data from the GDELT 2.0 Event
-Database via Google BigQuery.
-
-So far, I didn't decide for which problem to solve and what kind of model to
-train, because I want to find a suitable dataset first.
-
-Here's what I'm looking for data:
-- with time stamps that's updated regularly, so I can train an initial model
-and then schedule it to run periodically and monitor it
-- that's sufficiently large to train a model on
-- that has some interesting features and a suitable target variable
-
-During a brief search, I found the GDELT 2.0 Event Database, which is a public
-and free database that contains event data from all over the world.
-It seems to fulfill these requirements and is available via BigQuery.
-
-Here, I will check if I can get some data from it and if it's suitable for my
-needs.
-
-Data is downloaded using Google BigQuery.
-
-You need to install the Google Cloud CLI.
-FIXME: Include instructions or at least a link.
-
-Then adapt the `.env` file to your project ID. Use `.env.example` as a template.
-Then run the setup script I wrote: `./scripts/setup_gcloud.sh`
-
-Finally, download and save the actual data using the script I wrote:
-`.scripts/download_data_with_BigQuery.py`.
-
-
-Get 10k random rows from GDELT events table from year 2024.
-
-I decided to go for a sample size 10k rows, because that should be an acceptable
-balance between speed of model training and showing it enough data.
-If I go for an 80:20 train:test split, I will end up with 8k rows for training
-and 2k rows for testing.
-There are just 24 features and one target variable.
-So basically the ration rows to features is 10000:24, which is 416.67.
-I intend to use tree based algorithms such as XGBoost, CatBoost and LightGBM.
-They are rather data efficient, and at this ratio, maybe it's even already
-enough for acceptable performance.
-
-Honestly, I could go for **much** more than that though, but then models would
-train much longer, too.
-This is some sort of a subset for speed of development.
-At the same time, I could have also gone for much less than that, but then it
-would definitely become a true subset, and whatever I train would likely be
-underperforming.
-So I decide to go with this as a compromise and check how well it performs.
-If it does good enough, I won't need to go for a larger subset.
-If it doesn't perform well, I can at least select hyperparameters and then go
-for a larger subset.
-Then again, this is not a machine learning engineering course, but a machine
-learning *operations*, so I don't need to get the best possible model in the
-first place.
-A good model is sufficient.
-
-
-Split the data first to prevent data leakage.
-Make a truly unseen hold out test set, which will not be used for training or
-validation at all.
-It will only be used to evaluate one single final model in the very end.
-
-I will use a 80:20 split for training and testing.
-This will leave me with 8k rows for training and 2k rows for testing.
-For development, I will use 5-fold cross validation.
-
-## Data Preparation
-
-```bash
+# prepare data for modeling
 uv run python scripts/prepare_data_for_modeling.py --train --query --subset
-```
 
-This will prepare the data for training and testing as well as a subset of the
-training data for rapid prototyping.
-
-## Model Development
-
-```bash
+# train models
 uv run python scripts/develop_models.py
 ```
 
+Prefect handles workflow scheduling, dependency management, and automated pipeline execution. The flows are containerized and can be triggered on schedule or demand.
 
+### Model Serving
 
+Access MLflow UI at `http://localhost:5001`
 
+### API Examples
 
-
-# MLflow Docker Setup
-
-## Quick Start
-
-### Requirements
-
-- Docker
-- Git (optional, but makes it easier to get code via cloning)
-
-### Instructions
-
-1. Clone this repository
-
-2. Create a `.env` file with your database credentials:
-
-   ```bash
-   POSTGRES_USER=your_username_here
-   POSTGRES_PASSWORD=your_secure_password_here
-   POSTGRES_DB=mlflow
-   ```
-   
-3. Start the services:
-   
-   ```bash
-   # first time setup (builds images)
-   docker-compose up --build -d
-   
-   # subsequent starts (uses existing images)
-   docker-compose up -d
-   ```
-
-4. Access MLflow UI at: `http://localhost:5001`
-
-5. Stop the services:
-
-   ```bash
-   docker-compose down
-   ```
-
-## Environment Variables
-
-Create a `.env` file with these variables:
-- `POSTGRES_USER` - Database username
-- `POSTGRES_PASSWORD` - Database password (choose a secure one)
-- `POSTGRES_DB` - `mlflow`
-
-## Further Software
-
-You also need this software, but it doesn't really belong to the project itself.
-Rather, it's some system dependency.
-- libomp
-
-
-
-
-
-
-
-
-## Query Model Examples
-
-Start the Docker compose.
-
-### Single Prediction
-
+**Single prediction:**
 ```bash
 curl -X POST http://localhost:5002/predict \
   -H "Content-Type: application/json" \
@@ -263,46 +123,26 @@ curl -X POST http://localhost:5002/predict \
   }'
 ```
 
-### Batch Prediction
+**Batch prediction:**
 ```bash
 curl -X POST http://localhost:5002/predict \
   -H "Content-Type: application/json" \
-  -d '[
-    {
-      "QuadClass": 3,
-      "GoldsteinScale": -2.5,
-      "ActionGeo_Lat": 45.5,
-      "ActionGeo_Long": -75.2,
-      "EventCode": 120.0,
-      "EventBaseCode": 12.0,
-      "EventRootCode": 1.0,
-      "Actor1Code": 100.0,
-      "Actor1Name": 50.0,
-      "Actor1CountryCode": 10.0,
-      "ActionGeo_CountryCode": 30.0,
-      "year": 2024,
-      "month": 8,
-      "day_of_year": 230,
-      "day_of_week": 3,
-      "is_weekend": 0
-    },
-    {
-      "QuadClass": 2,
-      "GoldsteinScale": -1.5,
-      "ActionGeo_Lat": 40.5,
-      "ActionGeo_Long": -80.2,
-      "EventCode": 110.0,
-      "EventBaseCode": 11.0,
-      "EventRootCode": 1.0,
-      "Actor1Code": 150.0,
-      "Actor1Name": 60.0,
-      "Actor1CountryCode": 15.0,
-      "ActionGeo_CountryCode": 35.0,
-      "year": 2024,
-      "month": 9,
-      "day_of_year": 250,
-      "day_of_week": 1,
-      "is_weekend": 0
-    }
-  ]'
+  -d '[{...}, {...}]'  # array of prediction objects
+```
+
+## Monitoring
+
+Model performance and data drift monitoring is implemented using **Evidently**. This includes tracking of prediction quality, feature drift, and target drift over time.
+
+**Note**: Monitoring implementation is currently under construction. A basic version is available that logs metrics to the monitoring database, but dashboards and alerting are still being developed.
+
+### Services
+- MLflow: `http://localhost:5001` 
+- Model API: `http://localhost:5002`
+- Grafana: Check docker-compose.yaml for port
+- Prefect UI: Check docker-compose.yaml for port
+
+### Stop Services
+```bash
+docker-compose down
 ```
