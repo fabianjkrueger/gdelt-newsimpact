@@ -18,7 +18,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
 
 from tasks.data_tasks import download_fresh_gdelt_data, prepare_inference_data
-from tasks.model_tasks import get_model_predictions, store_prediction_metadata
+from tasks.model_tasks import get_model_predictions, store_prediction_metadata, store_monitoring_metrics
 
 
 @flow(name="gdelt-daily-inference", log_prints=True)
@@ -76,6 +76,12 @@ def daily_inference_pipeline(
             predictions_path=predictions_path,
             features_path=features_path,
             data_version=data_version
+        )
+        
+        # After the store_prediction_metadata task
+        monitoring_result = store_monitoring_metrics(
+            predictions_path,
+            data_version
         )
         
         # summary

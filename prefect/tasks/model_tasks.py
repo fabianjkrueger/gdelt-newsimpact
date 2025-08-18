@@ -168,3 +168,14 @@ def store_prediction_metadata(
     logger.info(f"Prediction summary: {metadata['prediction_stats']}")
     
     return metadata
+
+
+@task
+def store_monitoring_metrics(predictions_path: str, data_version: str):
+    """Store basic monitoring metrics"""
+    from monitoring.scripts.calculate_metrics import calculate_simple_metrics
+    
+    metrics = calculate_simple_metrics(predictions_path, data_version)
+    logger = get_run_logger()
+    logger.info(f"Stored metrics for {data_version}: {metrics['num_predictions']} predictions")
+    return metrics

@@ -1,0 +1,14 @@
+apiVersion: 1
+
+datasources:
+  - name: PostgreSQL-GDELT
+    type: postgres
+    access: proxy
+    url: db:5432
+    database: prefect
+    user: prefect
+    secureJsonData:
+      password: 'prefect'
+    jsonData:
+      sslmode: 'disable'
+      database: prefect
