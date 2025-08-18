@@ -41,3 +41,6 @@ __pycache__/
 catboost_info/
 */catboost_info/
 */catboost_info/*
+
+# an example for how to monitor the model
+example_monitoring/
