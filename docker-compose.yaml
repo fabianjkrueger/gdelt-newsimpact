@@ -41,3 +41,16 @@ services:
       - mlflow
     volumes:
       - ./mlartifacts:/mlartifacts:rw
+
+  prefect-server:
+    image: prefecthq/prefect:3-latest
+    ports:
+      - "4200:4200"
+    environment:
+      - PREFECT_UI_URL=http://127.0.0.1:4200/api
+      - PREFECT_API_URL=http://127.0.0.1:4200/api
+    command: prefect server start --host 0.0.0.0
+    volumes:
+      - ./prefect:/app/prefect:rw
+      - ./data:/app/data:rw
+      - ./scripts:/app/scripts:rw
