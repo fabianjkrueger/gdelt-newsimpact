@@ -86,13 +86,16 @@ def prepare_inference_data(
         "--query-data-file", raw_data_path
     ]
     
+    logger.info(f"Running command: {' '.join(cmd)}")
+    
     try:
         result = subprocess.run(
             cmd, 
             cwd=project_root,  # Set working directory
             check=True, 
             capture_output=True, 
-            text=True
+            text=True,
+            timeout=30  # 30 sec timeout
         )
         logger.info("Data preparation completed successfully")
         logger.info(f"Script output: {result.stdout}")
@@ -100,7 +103,11 @@ def prepare_inference_data(
         # return expected features file path
         return f"data/intermediate/{data_version}/X_query.parquet"
         
+    except subprocess.TimeoutExpired:
+        logger.error(f"Data preparation timed out after 5 minutes")
+        raise
     except subprocess.CalledProcessError as e:
         logger.error(f"Data preparation failed: {e}")
         logger.error(f"Error output: {e.stderr}")
+        logger.error(f"Standard output: {e.stdout}")
         raise

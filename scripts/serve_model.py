@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 
 # load model from registry using alias (replaces staging in MLflow 3.x)
-mlflow.set_tracking_uri("http://host.docker.internal:5001")
+mlflow.set_tracking_uri("http://mlflow:5000")
 model_name = "gdelt-event-classifier"
 alias = "cyber_dragon"  # alias replaces staging concept in MLflow 3.x
 model_uri = f"models:/{model_name}@{alias}"
@@ -92,4 +92,4 @@ def model_info():
     })
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=False)
+    app.run(host="0.0.0.0", port=5002, debug=False)

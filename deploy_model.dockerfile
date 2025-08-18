@@ -13,8 +13,8 @@ RUN pip install --no-cache-dir flask==3.0.0 gunicorn==23.0.0
 COPY scripts/serve_model.py .
 
 # expose the port the app runs on
-EXPOSE 5000
+EXPOSE 5002
 
 # run the serving script
-CMD ["gunicorn", "serve_model:app", "--bind", "0.0.0.0:5000", "--workers", "1"]
+CMD ["gunicorn", "serve_model:app", "--bind", "0.0.0.0:5002", "--workers", "1"]
 

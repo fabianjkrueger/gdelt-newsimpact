@@ -435,7 +435,10 @@ def main(train, query, subset, subset_size=1000, data_version="2024_subset_10k",
 
     # MLFlow
     # set MLFlow tracking URI or rather: basically connect to the MLFlow server
-    mlflow.set_tracking_uri("http://127.0.0.1:5001")
+    # Use environment variable if available, otherwise default to local
+    mlflow_uri = os.getenv("MLFLOW_TRACKING_URI", "http://127.0.0.1:5001")
+    mlflow.set_tracking_uri(mlflow_uri)
+    print(f"Using MLflow URI: {mlflow_uri}")
 
     # set experiment
     #mlflow.set_experiment("gdelt-newsimpact")

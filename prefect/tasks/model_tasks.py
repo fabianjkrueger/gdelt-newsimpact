@@ -9,20 +9,19 @@ from datetime import datetime
 from prefect import task, get_run_logger
 from typing import Dict, Any
 import json
+import os
 
 
 @task
 def get_model_predictions(
     features_path: str,
-    data_version: str,
-    model_service_url: str = "http://localhost:5002"
+    data_version: str
 ) -> str:
-    """Get predictions from deployed model service"""
+    """Get predictions from deployed model service via HTTP"""
     logger = get_run_logger()
     
-    # get project root directory
-    project_root = Path(__file__).parent.parent.parent
-    
+    # use environment variable for model service URL, fallback to localhost for local testing
+    model_service_url = os.getenv("MODEL_SERVICE_URL", "http://localhost:5002")
     logger.info(f"Using model service at {model_service_url}")
     
     try:
@@ -35,6 +34,7 @@ def get_model_predictions(
         logger.info(f"Model service healthy: {health_data}")
         
         # load features (path is relative to project root)
+        project_root = Path(__file__).parent.parent.parent
         features_full_path = project_root / features_path
         logger.info(f"Loading features from {features_full_path}")
         X = pd.read_parquet(features_full_path)

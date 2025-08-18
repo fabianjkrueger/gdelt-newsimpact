@@ -35,10 +35,12 @@ services:
     build:
       context: .
       dockerfile: deploy_model.dockerfile
-    ports:
-      - "5002:5000"
     depends_on:
       - mlflow
+    ports:
+      - "5002:5002"
+    environment:
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
     volumes:
       - ./mlartifacts:/mlartifacts:rw
 
@@ -51,6 +53,30 @@ services:
       - PREFECT_API_URL=http://127.0.0.1:4200/api
     command: prefect server start --host 0.0.0.0
     volumes:
-      - ./prefect:/app/prefect:rw
+      - ./prefect:/app/prefect:ro
       - ./data:/app/data:rw
-      - ./scripts:/app/scripts:rw
+      - ./scripts:/app/scripts:ro
+
+  prefect-worker:
+    build:
+      context: .
+      dockerfile: prefect-worker.dockerfile
+    depends_on:
+      - prefect-server
+      - deploy_model
+    environment:
+      - PREFECT_API_URL=http://prefect-server:4200/api
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+      - MODEL_SERVICE_URL=http://deploy_model:5002  # Add this line
+      - GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT:-mlops-zoomcamp-1337420697}
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/bigquery-credentials.json
+    volumes:
+      - ./prefect:/app/prefect:ro
+      - ./data:/app/data:rw
+      - ./monitoring:/app/monitoring:rw
+      - ./scripts:/app/scripts:ro
+      - ./bigquery-credentials.json:/app/bigquery-credentials.json:ro
+      - ./.env:/app/.env:ro
+      - ./mlartifacts:/app/mlartifacts:ro
+    working_dir: /app
+    command: python prefect/deploy.py
