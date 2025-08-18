@@ -47,11 +47,9 @@ def predict():
         
         # expected features based on model signature from MLmodel file
         expected_features = [
-            "EventCode", "EventBaseCode", "EventRootCode", "QuadClass", 
-            "GoldsteinScale", "Actor1Code", "Actor1Name", "Actor1CountryCode",
-            "Actor2Code", "Actor2Name", "Actor2CountryCode",
-            "ActionGeo_CountryCode", "ActionGeo_ADM1Code",
-            "ActionGeo_Lat", "ActionGeo_Long", "ActionGeo_FeatureID", 
+            "QuadClass", "GoldsteinScale", "ActionGeo_Lat", "ActionGeo_Long",
+            "EventCode", "EventBaseCode", "EventRootCode", "Actor1Code", 
+            "Actor1Name", "Actor1CountryCode", "ActionGeo_CountryCode",
             "year", "month", "day_of_year", "day_of_week", "is_weekend"
         ]
         
@@ -86,11 +84,9 @@ def model_info():
         "alias": alias,
         "model_uri": model_uri,
         "expected_features": [
-            "EventCode", "EventBaseCode", "EventRootCode", "QuadClass", 
-            "GoldsteinScale", "Actor1Code", "Actor1Name", "Actor1CountryCode",
-            "Actor2Code", "Actor2Name", "Actor2CountryCode",
-            "ActionGeo_CountryCode", "ActionGeo_ADM1Code",
-            "ActionGeo_Lat", "ActionGeo_Long", "ActionGeo_FeatureID",
+            "QuadClass", "GoldsteinScale", "ActionGeo_Lat", "ActionGeo_Long",
+            "EventCode", "EventBaseCode", "EventRootCode", "Actor1Code", 
+            "Actor1Name", "Actor1CountryCode", "ActionGeo_CountryCode",
             "year", "month", "day_of_year", "day_of_week", "is_weekend"
         ]
     })

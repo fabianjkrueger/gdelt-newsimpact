@@ -3,7 +3,7 @@ FROM python:3.12.11-slim
 WORKDIR /app
 
 # copy model requirements and install dependencies
-COPY mlartifacts/2/models/m-54ad88dbea1c40139b5123ffaa9d4729/artifacts/requirements.txt .
+COPY mlartifacts/2/models/m-e17ab8ef2ccf46c3bff6e65e7c9509d3/artifacts/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # install further dependencies for serving

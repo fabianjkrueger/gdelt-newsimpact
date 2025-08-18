@@ -1,0 +1,44 @@
+artifact_path: mlflow-artifacts:/2/models/m-e17ab8ef2ccf46c3bff6e65e7c9509d3/artifacts
+flavors:
+  python_function:
+    data: model.xgb
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.xgboost
+    python_version: 3.12.11
+  xgboost:
+    code: null
+    data: model.xgb
+    model_class: xgboost.sklearn.XGBRegressor
+    model_format: xgb
+    xgb_version: 3.0.4
+is_signature_from_type_hint: false
+mlflow_version: 3.2.0
+model_id: m-e17ab8ef2ccf46c3bff6e65e7c9509d3
+model_size_bytes: 1036459
+model_uuid: m-e17ab8ef2ccf46c3bff6e65e7c9509d3
+prompts: null
+run_id: 111567cc14134a7cb7065f23892af874
+saved_input_example_info:
+  artifact_path: input_example.json
+  pandas_orient: split
+  serving_input_path: serving_input_example.json
+  type: dataframe
+signature:
+  inputs: '[{"type": "long", "name": "QuadClass", "required": true}, {"type": "double",
+    "name": "GoldsteinScale", "required": true}, {"type": "double", "name": "ActionGeo_Lat",
+    "required": true}, {"type": "double", "name": "ActionGeo_Long", "required": true},
+    {"type": "double", "name": "EventCode", "required": true}, {"type": "double",
+    "name": "EventBaseCode", "required": true}, {"type": "double", "name": "EventRootCode",
+    "required": true}, {"type": "double", "name": "Actor1Code", "required": true},
+    {"type": "double", "name": "Actor1Name", "required": true}, {"type": "double",
+    "name": "Actor1CountryCode", "required": true}, {"type": "double", "name": "ActionGeo_CountryCode",
+    "required": true}, {"type": "integer", "name": "year", "required": true}, {"type":
+    "integer", "name": "month", "required": true}, {"type": "integer", "name": "day_of_year",
+    "required": true}, {"type": "integer", "name": "day_of_week", "required": true},
+    {"type": "long", "name": "is_weekend", "required": true}]'
+  outputs: '[{"type": "tensor", "tensor-spec": {"dtype": "float32", "shape": [-1]}}]'
+  params: null
+type_hint_from_example: false
+utc_time_created: '2025-08-18 14:14:52.658049'
